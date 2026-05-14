@@ -220,22 +220,22 @@ def open_browser(url: str, user_id: str = "", password: str = ""):
 
     # --- 学習シーケンスを実行 ---
     # Vocabulary 自動学習シーケンスを実行
-    #run_vocabulary_automation(driver, url)
+    run_vocabulary_automation(driver, url)
     
     # Grammar 自動学習シーケンスを実行
-    #run_grammar_automation(driver, url)
+    run_grammar_automation(driver, url)
     
     # Reading 自動学習シーケンスを実行
     run_reading_automation(driver, url)
     
     # Dialogue 自動学習シーケンスを実行
-    #run_dialogue_automation(driver, url)
+    run_dialogue_automation(driver, url)
     
     # Dictation 自動学習シーケンスを実行
-    #run_dictation_automation(driver, url)
+    run_dictation_automation(driver, url)
     
     # Listening 自動学習シーケンスを実行
-    #run_listening_automation(driver, url)
+    run_listening_automation(driver, url)
 
     print("========================================")
 
