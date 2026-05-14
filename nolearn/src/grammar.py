@@ -6,6 +6,7 @@ import urllib.parse
 import json
 import time
 import random
+import src.config as config
 
 def start_grammar_learning(driver, target_step: str, timeout: int = 10) -> bool:
     """
@@ -221,7 +222,7 @@ def solve_grammar_question(driver, timeout: int = 10) -> bool:
     # 4. クリック
     try:
         print(f"  ✓ [Grammar] 選択肢 {best_idx} をクリックします")
-        delay = random.uniform(1.5, 5.0)
+        delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
         print(f"  [System] ボット検知回避のため {delay:.1f} 秒待機します...")
         time.sleep(delay)
         best_btn.click()
@@ -255,7 +256,8 @@ def run_grammar_automation(driver, url: str):
     if solve_grammar_question(driver, timeout=5):
         while solve_grammar_question(driver, timeout=5):
             pass
-        time.sleep(2)
+        delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
+        time.sleep(delay)
     else:
         print("  [System] step1 の問題が取得できませんでした（完了済み等）。スキップします。")
         
@@ -276,7 +278,8 @@ def run_grammar_automation(driver, url: str):
         
         while solve_grammar_question(driver, timeout=5):
             pass
-        time.sleep(2)
+        delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
+        time.sleep(delay)
         
         driver.get(url)
 

@@ -10,6 +10,7 @@ import json
 import difflib
 import time
 import random
+import src.config as config
 
 def start_vocabulary_learning(driver, target_step: str, timeout: int = 10) -> bool:
     """
@@ -140,7 +141,7 @@ def solve_vocabulary_question(driver, timeout: int = 10) -> bool:
     # 5. クリック
     try:
         print(f"  ✓ [Vocabulary] 選択肢 {best_idx} をクリックします (スコア: {best_score:.2f})")
-        delay = random.uniform(1.5, 5.0)
+        delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
         print(f"  [System] ボット検知回避のため {delay:.1f} 秒待機します...")
         time.sleep(delay)
         best_btn.click()
@@ -169,7 +170,8 @@ def run_vocabulary_automation(driver, url: str):
         # 2問目以降を解き続ける
         while solve_vocabulary_question(driver, timeout=5):
             pass
-        time.sleep(2)
+        delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
+        time.sleep(delay)
     else:
         print("  [System] step1 の問題が取得できませんでした（完了済み等）。スキップします。")
         
@@ -193,7 +195,8 @@ def run_vocabulary_automation(driver, url: str):
         # 2問目以降を解き続ける
         while solve_vocabulary_question(driver, timeout=5):
             pass
-        time.sleep(2)
+        delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
+        time.sleep(delay)
         
         # 次のループのためにメニューに戻る
         driver.get(url)

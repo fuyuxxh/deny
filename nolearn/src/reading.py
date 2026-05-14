@@ -3,6 +3,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import time
 import random
+import src.config as config
 
 def start_reading_learning(driver, timeout: int = 10) -> bool:
     """
@@ -45,7 +46,8 @@ def run_reading_automation(driver, url: str):
     
     if started:
         print("  [Reading] (※ここに後ほど問題を解くロジックを追加します)")
-        time.sleep(2)
+        delay = random.uniform(config.DELAY_MIN, config.DELAY_MAX)
+        time.sleep(delay)
     else:
         print("  [Reading] 学習する対象が見つかりませんでした。")
         

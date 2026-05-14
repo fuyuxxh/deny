@@ -2,9 +2,15 @@
 
 from src.gui import LoginGUI
 from src.main import open_browser
+import src.config as config
 
 
 def main():
+    # ---------------------------------------------------------
+    # [設定] ここでプロジェクト全体のバッファ（待機時間）を変更できます
+    config.DELAY_MIN = 2.0
+    config.DELAY_MAX = 5.0
+    # ---------------------------------------------------------
     # 1. GUI を表示して入力を受け取る
     app = LoginGUI()
     result = app.run()
