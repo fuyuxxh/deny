@@ -161,9 +161,32 @@ class LoginGUI:
             messagebox.showwarning("入力エラー", "Password を入力してください。")
             return
 
-        # URL にプロトコルが無ければ https:// を付与
-        if not url.startswith(("http://", "https://")):
-            url = "https://" + url
+        # URLスキームの判定と変換
+        is_debug = False
+        if url.startswith("debug://"):
+            url = url.replace("debug://", "https://", 1)
+            is_debug = True
+        elif url.startswith("http://"):
+            url = url.replace("http://", "https://", 1)
+        elif url.startswith("https://"):
+            pass
+        else:
+            messagebox.showerror("URLエラー", "URLは 'https://' で開始してください。")
+            return
+
+        # デバッグモードの場合、コンソールを立ち上げる
+        if is_debug:
+            try:
+                import ctypes
+                # Windowsのコンソールウィンドウを割り当てる
+                ctypes.windll.kernel32.AllocConsole()
+                # 標準出力を新しいコンソールに向ける
+                import sys
+                sys.stdout = open("CONOUT$", "w", encoding="utf-8", buffering=1)
+                sys.stderr = open("CONOUT$", "w", encoding="utf-8", buffering=1)
+                print(">>> DEBUG MODE: Console initialized. <<<")
+            except Exception as e:
+                print(f"Failed to allocate console: {e}")
 
         # 保存 — 成功時は結果を保持して GUI を閉じる
         if save_config(user_id, password):
