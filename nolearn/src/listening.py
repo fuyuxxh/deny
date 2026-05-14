@@ -111,7 +111,7 @@ def click_judge_button(driver, timeout: int = 10) -> bool:
         )
         btn.click()
         print("  ✓ [Listening] 「判定」ボタンをクリックしました")
-        delay = random.uniform(2.5, 7.5)
+        delay = random.uniform(1.5, 5.0)
         print(f"  [System] 元のURLに戻る前に {delay:.1f} 秒待機します...")
         time.sleep(delay)
         return True

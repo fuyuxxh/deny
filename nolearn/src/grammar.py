@@ -221,7 +221,7 @@ def solve_grammar_question(driver, timeout: int = 10) -> bool:
     # 4. クリック
     try:
         print(f"  ✓ [Grammar] 選択肢 {best_idx} をクリックします")
-        delay = random.uniform(2.5, 7.5)
+        delay = random.uniform(1.5, 5.0)
         print(f"  [System] ボット検知回避のため {delay:.1f} 秒待機します...")
         time.sleep(delay)
         best_btn.click()

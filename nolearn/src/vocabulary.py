@@ -140,7 +140,7 @@ def solve_vocabulary_question(driver, timeout: int = 10) -> bool:
     # 5. クリック
     try:
         print(f"  ✓ [Vocabulary] 選択肢 {best_idx} をクリックします (スコア: {best_score:.2f})")
-        delay = random.uniform(2.5, 7.5)
+        delay = random.uniform(1.5, 5.0)
         print(f"  [System] ボット検知回避のため {delay:.1f} 秒待機します...")
         time.sleep(delay)
         best_btn.click()

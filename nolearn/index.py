@@ -1,7 +1,7 @@
 """NoLearn エントリーポイント"""
 
 from src.gui import LoginGUI
-from main import open_browser
+from src.main import open_browser
 
 
 def main():
