@@ -2,3 +2,4 @@ config.env
 __pycache__
 session.json
 /temp/*
+test_ocr.py
