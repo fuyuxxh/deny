@@ -9,9 +9,6 @@ index.py から呼び出される。
 
 import sys
 import time
-import random
-import os
-import json
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
@@ -219,6 +216,9 @@ def open_browser(url: str, user_id: str = "", password: str = ""):
             return driver
 
     # --- 学習シーケンスを実行 ---
+    from datetime import timedelta
+    sequence_start_time = time.time()
+
     # Vocabulary 自動学習シーケンスを実行
     run_vocabulary_automation(driver, url)
     
@@ -237,6 +237,13 @@ def open_browser(url: str, user_id: str = "", password: str = ""):
     # Listening 自動学習シーケンスを実行
     run_listening_automation(driver, url)
 
+    sequence_end_time = time.time()
+    elapsed_time = sequence_end_time - sequence_start_time
+    formatted_time = str(timedelta(seconds=int(elapsed_time)))
+
+    print("========================================")
+    print(f"  [System] 全ての学習シーケンスが完了しました。")
+    print(f"  [System] 総所要時間: {formatted_time}")
     print("========================================")
 
     return driver
@@ -249,4 +256,4 @@ if __name__ == "__main__":
 
     target_url = sys.argv[1]
     open_browser(target_url)
-
+    

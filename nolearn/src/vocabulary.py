@@ -62,8 +62,8 @@ def start_vocabulary_learning(driver, target_step: str, timeout: int = 10) -> bo
         print(f"  ✗ [Vocabulary] {target_step} ボタンが見つからないか、クリック不可です。")
         return False
 
-def _get_translation(word: str) -> str:
-    url = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ja&dt=t&q=" + urllib.parse.quote(word)
+def _get_translation(word: str, sl: str = "en", tl: str = "ja") -> str:
+    url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q=" + urllib.parse.quote(word)
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     try:
         with urllib.request.urlopen(req) as response:
@@ -74,8 +74,8 @@ def _get_translation(word: str) -> str:
         return ""
 
 def _calc_score(translated: str, choice: str) -> float:
-    translated = translated.strip()
-    choice = choice.strip()
+    translated = translated.strip().lower()
+    choice = choice.strip().lower()
     if not translated or not choice:
         return 0.0
     if translated == choice:
@@ -84,27 +84,37 @@ def _calc_score(translated: str, choice: str) -> float:
         return 0.8
     return difflib.SequenceMatcher(None, translated, choice).ratio()
 
+_question_attempts = {}
+
 def solve_vocabulary_question(driver, timeout: int = 10) -> bool:
     """
     出題された英単語の意味を選択肢から選んでクリックする。
     """
+    global _question_attempts
     print("\n  [Vocabulary] 問題を解析中...")
     
-    # 1. 問題の英単語を取得
+    import re
+    # 1. 問題の単語を取得
     question_selector = 'div.MultipleChoiceQuestionBuilder__question___3Xy0n'
     try:
         q_elem = WebDriverWait(driver, timeout).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, question_selector))
         )
-        eng_word = q_elem.text.strip()
-        print(f"  [Vocabulary] 問題: {eng_word}")
+        question_word = q_elem.text.strip()
+        print(f"  [Vocabulary] 問題: {question_word}")
     except Exception as e:
-        print(f"  ✗ [Vocabulary] 問題の英単語が見つかりませんでした。")
+        print(f"  ✗ [Vocabulary] 問題の単語が見つかりませんでした。")
         return False
         
     # 2. 翻訳
-    translated_jp = _get_translation(eng_word)
-    print(f"  [Vocabulary] Google翻訳: {translated_jp}")
+    # 問題が日本語か英語か判定 (ひらがな、カタカナ、漢字を含むか)
+    is_ja = bool(re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', question_word))
+    if is_ja:
+        translated_target = _get_translation(question_word, sl="ja", tl="en")
+        print(f"  [Vocabulary] Google翻訳(ja->en): {translated_target}")
+    else:
+        translated_target = _get_translation(question_word, sl="en", tl="ja")
+        print(f"  [Vocabulary] Google翻訳(en->ja): {translated_target}")
     
     # 3. 選択肢を取得
     choices = []
@@ -126,17 +136,37 @@ def solve_vocabulary_question(driver, timeout: int = 10) -> bool:
     if not choices:
         return False
         
-    # 4. 一番近い選択肢を選ぶ
-    best_btn = choices[0][0]
-    best_score = -1.0
-    best_idx = 1
+    # 4. 一番近い選択肢を選ぶ（過去に間違えたものを除外）
+    tried_choices = _question_attempts.get(question_word, set())
+    valid_choices = []
     
     for idx, (btn, text) in enumerate(choices, 1):
-        score = _calc_score(translated_jp, text)
+        if text in tried_choices:
+            print(f"    - 選択肢 '{text}' は過去に失敗したため除外します。")
+        else:
+            valid_choices.append((idx, btn, text))
+            
+    # 全ての選択肢を除外してしまった場合のフェールセーフ
+    if not valid_choices:
+        print("  [System] すべての選択肢を試しました。この問題の履歴をリセットします。")
+        _question_attempts[question_word] = set()
+        valid_choices = [(idx, btn, text) for idx, (btn, text) in enumerate(choices, 1)]
+
+    best_btn = valid_choices[0][1]
+    best_text = valid_choices[0][2]
+    best_score = -1.0
+    best_idx = valid_choices[0][0]
+    
+    for idx, btn, text in valid_choices:
+        score = _calc_score(translated_target, text)
         if score > best_score:
             best_score = score
             best_btn = btn
+            best_text = text
             best_idx = idx
+
+    # 今回試す選択肢を履歴に記録
+    _question_attempts.setdefault(question_word, set()).add(best_text)
             
     # 5. クリック
     try:
@@ -161,6 +191,9 @@ def run_vocabulary_automation(driver, url: str):
     """
     英単語学習（step1を1回実行後、step2を無限ループ）を自動化する。
     """
+    global _question_attempts
+    _question_attempts.clear()
+
     # --- step1 を 1回実行 ---
     print("\n  [System] まず step1 を実行します (なければスキップ)。")
     start_vocabulary_learning(driver, target_step="btn-step1", timeout=5)
@@ -204,3 +237,4 @@ def run_vocabulary_automation(driver, url: str):
     # すべて終了したら元のURLに戻って終了
     print(f"  [System] すべての処理が完了しました。{url} に戻って終了します。")
     driver.get(url)
+    
