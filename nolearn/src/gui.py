@@ -10,8 +10,14 @@ from tkinter import messagebox
 import json
 import os
 
+import sys
 
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "config.env")
+if getattr(sys, 'frozen', False):
+    base_dir = os.path.dirname(sys.executable)
+else:
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+
+CONFIG_PATH = os.path.join(base_dir, "config.env")
 
 
 def load_config():

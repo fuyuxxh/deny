@@ -1,1 +1,4 @@
 config.env
+/temp/*
+/build/*
+/dist/*

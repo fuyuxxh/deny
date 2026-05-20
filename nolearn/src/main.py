@@ -10,6 +10,8 @@ index.py から呼び出される。
 import sys
 import time
 from selenium import webdriver
+import selenium.webdriver.chrome.webdriver  # PyInstallerの動的インポート対策
+import selenium.webdriver.chrome.service  # PyInstaller対策
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
