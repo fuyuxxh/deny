@@ -30,8 +30,8 @@ def check_ocr_language():
 def main():
     # ---------------------------------------------------------
     # [設定] ここでプロジェクト全体のバッファ（待機時間）を変更できます
-    config.DELAY_MIN = 2.5
-    config.DELAY_MAX = 4.5
+    config.DELAY_MIN = 1.5
+    config.DELAY_MAX = 2.5
     # ---------------------------------------------------------
     # 0. OCRエンジンのチェック
     check_ocr_language()

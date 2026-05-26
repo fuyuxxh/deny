@@ -139,6 +139,77 @@ class LoginGUI:
             entry.config(show=show)
         entry.pack(fill="x", ipady=6)
 
+        # -----------------------------
+        # ショートカットの追加実装
+        # -----------------------------
+        entry._history = [""]
+        entry._history_index = 0
+
+        def save_history():
+            current_text = entry.get()
+            if not entry._history or entry._history[entry._history_index] != current_text:
+                entry._history = entry._history[:entry._history_index + 1]
+                entry._history.append(current_text)
+                entry._history_index += 1
+                if len(entry._history) > 50:
+                    entry._history.pop(0)
+                    entry._history_index -= 1
+
+        def on_key(event):
+            if event.keysym not in ("Control_L", "Control_R", "Alt_L", "Alt_R", "Shift_L", "Shift_R"):
+                entry.after_idle(save_history)
+
+        def undo(event):
+            if entry._history_index > 0:
+                entry._history_index -= 1
+                entry.delete(0, tk.END)
+                entry.insert(0, entry._history[entry._history_index])
+            return "break"
+
+        def select_all(event):
+            entry.select_range(0, tk.END)
+            entry.icursor(tk.END)
+            return "break"
+
+        def copy(event):
+            try:
+                sel_first = entry.index("sel.first")
+                sel_last = entry.index("sel.last")
+                text = entry.get()[sel_first:sel_last]
+                entry.clipboard_clear()
+                entry.clipboard_append(text)
+            except tk.TclError:
+                pass
+            return "break"
+
+        def paste(event):
+            try:
+                text = entry.clipboard_get()
+                try:
+                    sel_first = entry.index("sel.first")
+                    sel_last = entry.index("sel.last")
+                    entry.delete(sel_first, sel_last)
+                except tk.TclError:
+                    pass
+                entry.insert(tk.INSERT, text)
+                entry.after_idle(save_history)
+            except tk.TclError:
+                pass
+            return "break"
+
+        entry.bind("<KeyPress>", on_key)
+        entry.bind("<Control-z>", undo)
+        entry.bind("<Control-Z>", undo)
+        entry.bind("<Control-a>", select_all)
+        entry.bind("<Control-A>", select_all)
+        entry.bind("<Control-c>", copy)
+        entry.bind("<Control-C>", copy)
+        entry.bind("<Control-v>", paste)
+        entry.bind("<Control-V>", paste)
+        entry.bind("<Return>", lambda e: self._on_execute())
+
+        entry.after_idle(save_history)
+
         return entry
 
     # ----------------------------------------------------------- ロジック

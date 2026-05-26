@@ -133,17 +133,24 @@ def extract_reading_data(driver, timeout: int = 10) -> bool:
         
     # 2. 回答の文字列の抽出
     _reading_extracted_answers.clear()
-    base_xpath = '//*[@id="root"]/div/div/div[2]/div/div/div[3]/div[3]/div/table[2]/tbody/tr[{}]/td[3]/div[1]/div[4]/div[2]'
     
-    # x = 2, 3, 4, 5
-    for x in range(2, 6):
-        ans_num = x - 1 # 1, 2, 3, 4 として保存
-        xpath = base_xpath.format(x)
+    # x = 2, 3, 4, 5, 6
+    for x in range(2, 7):
+        ans_num = x - 1 # 1, 2, 3, 4, 5 として保存
+        ans_type = "choice"
+        xpath_choice = f'//*[@id="root"]/div/div/div[2]/div/div/div[3]/div[3]/div/table[2]/tbody/tr[{x}]/td[3]/div[1]/div[4]/div[2]'
+        xpath_text = f'//*[@id="root"]/div/div/div[2]/div/div/div[3]/div[3]/div/table[2]/tbody/tr[{x}]/td[3]/div[1]/div[3]/div/div[2]/span'
+        
         try:
-            ans_elem = WebDriverWait(driver, 2).until(
-                EC.presence_of_element_located((By.XPATH, xpath))
+            ans_elem = WebDriverWait(driver, 1.5).until(
+                EC.presence_of_element_located((By.XPATH, xpath_choice))
             )
             text = ans_elem.text.strip()
+            
+            if "(未回答)" in text or "(未解答)" in text:
+                text_elem = driver.find_element(By.XPATH, xpath_text)
+                text = text_elem.text.strip()
+                ans_type = "text"
             
             # プレフィックスを削除
             for prefix in ['a. ', 'b. ', 'c. ', 'd. ', 'e. ', 'A. ', 'B. ', 'C. ', 'D. ', 'E. ']:
@@ -151,8 +158,8 @@ def extract_reading_data(driver, timeout: int = 10) -> bool:
                     text = text[len(prefix):].strip()
                     break
                     
-            _reading_extracted_answers[ans_num] = text
-            print(f"  ✓ [Reading] 回答 {ans_num}: {text}")
+            _reading_extracted_answers[ans_num] = {"text": text, "type": ans_type}
+            print(f"  ✓ [Reading] 回答 {ans_num}: {text} (タイプ: {ans_type})")
         except Exception:
             # 見つからなくなったら終了
             break
@@ -258,10 +265,33 @@ def solve_reading_test(driver, timeout: int = 10) -> bool:
     print("\n  [Reading] 自動解答を開始します...")
     
     # 抽出した答えの数だけループ
-    for x in range(1, len(_reading_extracted_answers) + 1):
-        target_answer = _reading_extracted_answers.get(x, "")
-        print(f"  [Reading] 問題 {x} の正解を探します: {target_answer}")
+    for x in range(1, 6):
+        ans_info = _reading_extracted_answers.get(x, None)
+        if not ans_info:
+            print(f"  [Reading] 問題 {x} の正解データがありません。スキップします。")
+            continue
+            
+        target_answer = ans_info["text"]
+        ans_type = ans_info["type"]
         
+        print(f"  [Reading] 問題 {x} の正解を探します: {target_answer} (タイプ: {ans_type})")
+        
+        if ans_type == "text":
+            # テキスト入力方式
+            try:
+                # 動的に x 番目の input 要素を取得して入力する
+                input_xpath = f'//*[@id="root"]/div/div/div[2]/div/div/div[3]/div/div/div[2]/div[2]/div/div[{x}]//input'
+                input_elem = WebDriverWait(driver, 2).until(
+                    EC.presence_of_element_located((By.XPATH, input_xpath))
+                )
+                input_elem.clear()
+                input_elem.send_keys(target_answer)
+                print(f"  ✓ [Reading] 問題 {x} にテキストを入力しました")
+                time.sleep(1.0)
+            except Exception as e:
+                print(f"  ✗ [Reading] 問題 {x} の入力に失敗しました: {e}")
+            continue
+            
         # y（選択肢番号）を探す
         matched = False
         for y in range(1, 10):

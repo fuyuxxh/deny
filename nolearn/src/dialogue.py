@@ -93,23 +93,26 @@ def click_dialogue_player(driver, timeout: int = 10) -> bool:
         print("  ✗ [Dialogue] 「学習する」プレイヤーリンクが見つかりませんでした。")
         return False
 
-def type_space_in_dialogue(driver, timeout: int = 10) -> bool:
+def click_dialogue_preliminary_choice(driver, timeout: int = 10) -> bool:
     """
-    採点を押す前にテキストボックスに半角スペースを入力する。
+    1周目の学習で、採点前に一番上の選択肢を仮で選択する。
     """
-    print("\n  [Dialogue] テキストボックスに <space> を入力します...")
-    xpath = '//*[@id="root"]/div/div/div[2]/div/div/div[3]/div/div/div[2]/div[2]/div/div[5]/div/div[2]/span[2]/input'
-    
+    print("\n  [Dialogue] 採点前の予備選択をクリック中...")
+    xpath = '//*[@id="root"]/div/div/div[2]/div/div/div[3]/div/div/div[2]/div[2]/div/div[1]/div/div[3]/ul/li[1]'
     try:
         elem = WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((By.XPATH, xpath))
+            EC.element_to_be_clickable((By.XPATH, xpath))
         )
-        elem.clear()
-        elem.send_keys(" ")
-        print("  ✓ [Dialogue] テキストボックスに <space> を入力しました")
+        try:
+            elem.click()
+        except:
+            driver.execute_script("arguments[0].click();", elem)
+            
+        print("  ✓ [Dialogue] 予備選択をクリックしました")
+        time.sleep(random.uniform(config.DELAY_MIN, config.DELAY_MAX))
         return True
-    except Exception:
-        print("  ✗ [Dialogue] テキストボックスが見つかりませんでした。")
+    except Exception as e:
+        print(f"  ✗ [Dialogue] 予備選択のクリックに失敗しました: {e}")
         return False
 
 def click_dialogue_confirm(driver, timeout: int = 10) -> bool:
@@ -158,45 +161,35 @@ def extract_dialogue_data(driver, timeout: int = 10) -> bool:
         
     # 2. 回答の文字列の抽出
     _dialogue_extracted_answers.clear()
-    base_xpath = '//*[@id="root"]/div/div/div[2]/div/div/div[3]/div[3]/div/table[2]/tbody/tr[{}]/td[3]/div[1]/div[4]/div[2]'
     
-    # x は 2, 3, 4, 5 (回答1, 2, 3, 4)
-    for x in range(2, 6):
+    # x は 2, 3, 4, 5, 6 (回答1, 2, 3, 4, 5)
+    for x in range(2, 7):
         ans_num = x - 1
-        xpath = base_xpath.format(x)
+        ans_type = "choice"
+        xpath_choice = f'//*[@id="root"]/div/div/div[2]/div/div/div[3]/div[3]/div/table[2]/tbody/tr[{x}]/td[3]/div[1]/div[4]/div[2]'
+        xpath_text = f'//*[@id="root"]/div/div/div[2]/div/div/div[3]/div[3]/div/table[2]/tbody/tr[{x}]/td[3]/div[1]/div[3]/div/div[2]/span'
+        
         try:
-            ans_elem = WebDriverWait(driver, 2).until(
-                EC.presence_of_element_located((By.XPATH, xpath))
+            ans_elem = WebDriverWait(driver, 1.5).until(
+                EC.presence_of_element_located((By.XPATH, xpath_choice))
             )
             text = ans_elem.text.strip()
-            # 'a. ', 'b. ' などのプレフィックスを削除
-            for prefix in ['a. ', 'b. ', 'c. ', 'd. ', 'e. ']:
+            
+            if "(未回答)" in text or "(未解答)" in text:
+                text_elem = driver.find_element(By.XPATH, xpath_text)
+                text = text_elem.text.strip()
+                ans_type = "text"
+                
+            # プレフィックスを削除
+            for prefix in ['a. ', 'b. ', 'c. ', 'd. ', 'e. ', 'A. ', 'B. ', 'C. ', 'D. ', 'E. ']:
                 if text.startswith(prefix):
-                    text = text[len(prefix):]
+                    text = text[len(prefix):].strip()
                     break
                     
-            _dialogue_extracted_answers[ans_num] = text
-            print(f"  ✓ [Dialogue] 回答 {ans_num}: {text}")
+            _dialogue_extracted_answers[ans_num] = {"text": text, "type": ans_type}
+            print(f"  ✓ [Dialogue] 回答 {ans_num}: {text} (タイプ: {ans_type})")
         except Exception:
             break
-            
-    # 回答5 (tr[6]) の特別抽出
-    ans5_xpath = '//*[@id="root"]/div/div/div[2]/div/div/div[3]/div[3]/div/table[2]/tbody/tr[6]/td[3]/div[1]/div[3]/div/div[2]/span'
-    try:
-        ans5_elem = WebDriverWait(driver, 2).until(
-            EC.presence_of_element_located((By.XPATH, ans5_xpath))
-        )
-        text5 = ans5_elem.text.strip()
-        # プレフィックスを削除
-        for prefix in ['a. ', 'b. ', 'c. ', 'd. ', 'e. ']:
-            if text5.startswith(prefix):
-                text5 = text5[len(prefix):]
-                break
-                
-        _dialogue_extracted_answers[5] = text5
-        print(f"  ✓ [Dialogue] 回答 5: {text5}")
-    except Exception:
-        print("  ✗ [Dialogue] 回答 5 の抽出に失敗しました。")
             
     return True
 
@@ -279,27 +272,28 @@ def solve_dialogue_test(driver, timeout: int = 10) -> bool:
     base_xpath = '//*[@id="root"]/div/div/div[2]/div/div/div[3]/div/div/div[2]/div[2]/div/div[{}]/div/div[3]/ul/li[{}]'
     
     for x in range(1, 6):
-        target_ans = _dialogue_extracted_answers.get(x, "")
-        if not target_ans:
+        ans_info = _dialogue_extracted_answers.get(x, None)
+        if not ans_info:
             print(f"  [Dialogue] 問題 {x} の正解データがありません。スキップします。")
             continue
             
-        print(f"  [Dialogue] 問題 {x} (正解: {target_ans}) を処理中...")
+        target_ans = ans_info["text"]
+        ans_type = ans_info["type"]
+            
+        print(f"  [Dialogue] 問題 {x} (正解: {target_ans}, タイプ: {ans_type}) を処理中...")
         
-        if x == 5:
-            # x=5 の時は input
+        if ans_type == "text":
             try:
-                # ユーザー指定の正確な XPath
-                input_xpath = '//*[@id="root"]/div/div/div[2]/div/div/div[3]/div/div/div[2]/div[2]/div/div[5]/div/div[2]/span[2]/input'
+                input_xpath = f'//*[@id="root"]/div/div/div[2]/div/div/div[3]/div/div/div[2]/div[2]/div/div[{x}]//input'
                 input_elem = WebDriverWait(driver, 2).until(
                     EC.presence_of_element_located((By.XPATH, input_xpath))
                 )
                 input_elem.clear()
                 input_elem.send_keys(target_ans)
-                print("  ✓ [Dialogue] 問題 5 にテキストを入力しました")
+                print(f"  ✓ [Dialogue] 問題 {x} にテキストを入力しました")
                 time.sleep(1)
             except Exception as e:
-                print(f"  ✗ [Dialogue] 問題 5 の入力に失敗しました: {e}")
+                print(f"  ✗ [Dialogue] 問題 {x} の入力に失敗しました: {e}")
             continue
         answered = False
         for y in range(1, 6):
@@ -468,8 +462,8 @@ def run_dialogue_automation(driver, url: str):
     if not clicked_player_1: return
     time.sleep(random.uniform(config.DELAY_MIN, config.DELAY_MAX))
         
-    # テキストボックスにスペースを入力
-    type_space_in_dialogue(driver, timeout=5)
+    # 採点前に予備選択をクリック
+    click_dialogue_preliminary_choice(driver, timeout=5)
         
     # 10. 「採点」ボタン(confirmButton)を押す
     clicked_confirm_1 = click_dialogue_confirm(driver, timeout=10)
