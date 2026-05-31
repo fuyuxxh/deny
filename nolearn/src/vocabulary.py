@@ -62,27 +62,66 @@ def start_vocabulary_learning(driver, target_step: str, timeout: int = 10) -> bo
         print(f"  ✗ [Vocabulary] {target_step} ボタンが見つからないか、クリック不可です。")
         return False
 
-def _get_translation(word: str, sl: str = "en", tl: str = "ja") -> str:
-    url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&q=" + urllib.parse.quote(word)
+def _get_translation(word: str, sl: str = "en", tl: str = "ja") -> list[str]:
+    """
+    Google翻訳で翻訳する。dt=at(代替翻訳)+dt=bd(辞書)も取得して類義語リストとして返す。
+    戻り値: 翻訳結果のリスト（メイン翻訳 + 代替翻訳 + 辞書エントリ）。空リストの場合は翻訳失敗。
+    """
+    url = f"https://translate.googleapis.com/translate_a/single?client=gtx&sl={sl}&tl={tl}&dt=t&dt=at&dt=bd&q=" + urllib.parse.quote(word)
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     try:
         with urllib.request.urlopen(req) as response:
             data = json.loads(response.read().decode('utf-8'))
-            return data[0][0][0]
+            results = []
+            # メイン翻訳 (data[0][0][0])
+            if data and data[0] and data[0][0]:
+                main_translation = data[0][0][0]
+                if main_translation:
+                    results.append(main_translation)
+            # 代替翻訳 (data[5][0][2] に [[alt1, ...], [alt2, ...], ...] の形式)
+            try:
+                if data and len(data) > 5 and data[5]:
+                    for entry in data[5]:
+                        if entry and len(entry) > 2 and entry[2]:
+                            for alt in entry[2]:
+                                if alt and alt[0] and alt[0] not in results:
+                                    results.append(alt[0])
+            except (IndexError, TypeError):
+                pass
+            # 辞書エントリ (data[1] に [[品詞, [翻訳1, 翻訳2, ...], ...], ...] の形式)
+            try:
+                if data and len(data) > 1 and data[1]:
+                    for pos_entry in data[1]:
+                        if pos_entry and len(pos_entry) > 1 and pos_entry[1]:
+                            for dict_word in pos_entry[1]:
+                                if dict_word and dict_word not in results:
+                                    results.append(dict_word)
+            except (IndexError, TypeError):
+                pass
+            return results
     except Exception as e:
         print(f"  [Vocabulary] 翻訳エラー: {e}")
-        return ""
+        return []
 
-def _calc_score(translated: str, choice: str) -> float:
-    translated = translated.strip().lower()
-    choice = choice.strip().lower()
-    if not translated or not choice:
+def _calc_single_score(a: str, b: str) -> float:
+    """2つの文字列間の類似度スコアを計算する。"""
+    a = a.strip().lower()
+    b = b.strip().lower()
+    if not a or not b:
         return 0.0
-    if translated == choice:
+    if a == b:
         return 1.0
-    if translated in choice or choice in translated:
+    if a in b or b in a:
         return 0.8
-    return difflib.SequenceMatcher(None, translated, choice).ratio()
+    return difflib.SequenceMatcher(None, a, b).ratio()
+
+def _calc_score(translated_list: list[str], choice: str) -> float:
+    """
+    翻訳結果リストと選択肢テキストを比較し、最高スコアを返す。
+    """
+    if not translated_list or not choice:
+        return 0.0
+    return max(_calc_single_score(t, choice) for t in translated_list)
 
 _question_attempts = {}
 
@@ -106,15 +145,17 @@ def solve_vocabulary_question(driver, timeout: int = 10) -> bool:
         print(f"  ✗ [Vocabulary] 問題の単語が見つかりませんでした。")
         return False
         
-    # 2. 翻訳
+    # 2. 翻訳（代替翻訳リスト付き）
     # 問題が日本語か英語か判定 (ひらがな、カタカナ、漢字を含むか)
     is_ja = bool(re.search(r'[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]', question_word))
     if is_ja:
-        translated_target = _get_translation(question_word, sl="ja", tl="en")
-        print(f"  [Vocabulary] Google翻訳(ja->en): {translated_target}")
+        translated_list = _get_translation(question_word, sl="ja", tl="en")
+        reverse_sl, reverse_tl = "en", "ja"
+        print(f"  [Vocabulary] Google翻訳(ja->en): {translated_list}")
     else:
-        translated_target = _get_translation(question_word, sl="en", tl="ja")
-        print(f"  [Vocabulary] Google翻訳(en->ja): {translated_target}")
+        translated_list = _get_translation(question_word, sl="en", tl="ja")
+        reverse_sl, reverse_tl = "ja", "en"
+        print(f"  [Vocabulary] Google翻訳(en->ja): {translated_list}")
     
     # 3. 選択肢を取得
     choices = []
@@ -158,7 +199,45 @@ def solve_vocabulary_question(driver, timeout: int = 10) -> bool:
     best_idx = valid_choices[0][0]
     
     for idx, btn, text in valid_choices:
-        score = _calc_score(translated_target, text)
+        # 順方向スコア: 翻訳リスト vs 選択肢（全体）
+        forward_score = _calc_score(translated_list, text)
+        
+        # 順方向スコア（パーツ別）: 選択肢を「、」で分割して各パーツとも比較
+        parts = [p.strip() for p in text.split('、') if p.strip()]
+        if len(parts) > 1:
+            for part in parts:
+                part_score = _calc_score(translated_list, part)
+                if part_score > forward_score:
+                    forward_score = part_score
+        
+        # 逆方向スコア: 選択肢を逆翻訳して問題文と比較
+        reverse_score = 0.0
+        try:
+            # 全体を逆翻訳
+            reverse_translations = _get_translation(text, sl=reverse_sl, tl=reverse_tl)
+            if reverse_translations:
+                reverse_score = max(
+                    _calc_single_score(rt, question_word) for rt in reverse_translations
+                )
+            
+            # パーツ別に逆翻訳（「、」区切りの複合フレーズ対応）
+            if len(parts) > 1:
+                for part in parts:
+                    part_translations = _get_translation(part, sl=reverse_sl, tl=reverse_tl)
+                    if part_translations:
+                        part_reverse = max(
+                            _calc_single_score(rt, question_word) for rt in part_translations
+                        )
+                        if part_reverse > reverse_score:
+                            reverse_score = part_reverse
+            
+            if reverse_score > 0.5:
+                print(f"    + 選択肢 '{text}' の逆翻訳が問題文と一致 (スコア: {reverse_score:.2f})")
+        except Exception:
+            pass
+        
+        # 最終スコア: 順方向と逆方向の最大値を採用
+        score = max(forward_score, reverse_score)
         if score > best_score:
             best_score = score
             best_btn = btn
