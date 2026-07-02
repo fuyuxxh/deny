@@ -220,24 +220,29 @@ def open_browser(url: str, user_id: str = "", password: str = ""):
     # --- 学習シーケンスを実行 ---
     from datetime import timedelta
     sequence_start_time = time.time()
+    
+    Isinsert = False
 
-    # Vocabulary 自動学習シーケンスを実行
-    run_vocabulary_automation(driver, url)
-    
-    # Grammar 自動学習シーケンスを実行
-    run_grammar_automation(driver, url)
-    
-    # Reading 自動学習シーケンスを実行
-    run_reading_automation(driver, url)
-    
-    # Dialogue 自動学習シーケンスを実行
-    run_dialogue_automation(driver, url)
-    
-    # Dictation 自動学習シーケンスを実行
-    run_dictation_automation(driver, url)
-    
     # Listening 自動学習シーケンスを実行
-    run_listening_automation(driver, url)
+    #run_listening_automation(driver, url)
+
+    # Dictation 自動学習シーケンスを実行
+    #run_dictation_automation(driver, url)
+
+    # Dialogue 自動学習シーケンスを実行
+    #run_dialogue_automation(driver, url)
+
+    # Reading 自動学習シーケンスを実行
+    Isinsert = run_reading_automation(driver, url)
+
+    if not Isinsert:
+        # Grammar 自動学習シーケンスを実行
+        run_grammar_automation(driver, url)
+
+        # Vocabulary 自動学習シーケンスを実行
+        run_vocabulary_automation(driver, url)
+    else:
+        print("\n  [System] Isinsert = True のため、Grammar・Vocabularyをスキップします")
 
     sequence_end_time = time.time()
     elapsed_time = sequence_end_time - sequence_start_time
